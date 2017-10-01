@@ -1,4 +1,5 @@
 # Derived from keras-rl
+import opensim as osim
 import numpy as np
 import sys
 
@@ -15,15 +16,14 @@ from rl.random import OrnsteinUhlenbeckProcess
 from osim.env import *
 from osim.http.client import Client
 
-from keras.optimizers import RMSprop
-
 import argparse
 import math
+
 # Command line parameters
 parser = argparse.ArgumentParser(description='Train or test neural net motor controller')
 parser.add_argument('--train', dest='train', action='store_true', default=True)
 parser.add_argument('--test', dest='train', action='store_false', default=True)
-parser.add_argument('--steps', dest='steps', action='store', default=500000, type=int)
+parser.add_argument('--steps', dest='steps', action='store', default=10000, type=int)
 parser.add_argument('--visualize', dest='visualize', action='store_true', default=False)
 parser.add_argument('--model', dest='model', action='store', default="example.h5f")
 parser.add_argument('--token', dest='token', action='store', required=False)
@@ -68,7 +68,7 @@ critic = Model(inputs=[action_input, observation_input], outputs=x)
 print(critic.summary())
 
 # Set up the agent for training
-memory = SequentialMemory(limit=500000, window_length=1)
+memory = SequentialMemory(limit=100000, window_length=1)
 random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.2, size=env.noutput)
 agent = DDPGAgent(nb_actions=nb_actions, actor=actor, critic=critic, critic_action_input=action_input,
                   memory=memory, nb_steps_warmup_critic=100, nb_steps_warmup_actor=100,
@@ -83,7 +83,7 @@ agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 # slows down training quite a lot. You can always safely abort the training prematurely using
 # Ctrl + C.
 if args.train:
-    agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.timestep_limit, log_interval=500000)
+    agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.timestep_limit, log_interval=10000)
     # After training is done, we save the final weights.
     agent.save_weights(args.model, overwrite=True)
 
