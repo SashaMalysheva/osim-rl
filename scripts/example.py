@@ -6,6 +6,8 @@ from keras.models import Sequential, Model
 from keras.layers import Dense, Activation, Flatten, Input, concatenate
 from keras.optimizers import Adam
 
+from keras.layers import LSTM
+
 import numpy as np
 
 from rl.agents import DDPGAgent
@@ -42,12 +44,12 @@ nallsteps = args.steps
 # Next, we build a very simple model.
 actor = Sequential()
 actor.add(Flatten(input_shape=(1,) + env.observation_space.shape))
-actor.add(Dense(32))
+actor.add(LSTM(128))
+actor.add(Activation('tanh'))
+actor.add(LSTM(512))
 actor.add(Activation('relu'))
-actor.add(Dense(32))
-actor.add(Activation('relu'))
-actor.add(Dense(32))
-actor.add(Activation('relu'))
+actor.add(LSTM(256))
+actor.add(Activation('tanh'))
 actor.add(Dense(nb_actions))
 actor.add(Activation('sigmoid'))
 print(actor.summary())
@@ -56,12 +58,12 @@ action_input = Input(shape=(nb_actions,), name='action_input')
 observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
 flattened_observation = Flatten()(observation_input)
 x = concatenate([action_input, flattened_observation])
-x = Dense(64)(x)
+x = LSTM(512)(x)
+x = Activation('tanh')(x)
+x = LSTM(256)(x)
 x = Activation('relu')(x)
-x = Dense(64)(x)
-x = Activation('relu')(x)
-x = Dense(64)(x)
-x = Activation('relu')(x)
+x = LSTM(128)(x)
+x = Activation('tanh')(x)
 x = Dense(1)(x)
 x = Activation('linear')(x)
 critic = Model(inputs=[action_input, observation_input], outputs=x)
