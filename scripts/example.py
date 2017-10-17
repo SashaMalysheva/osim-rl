@@ -1,12 +1,13 @@
 # Derived from keras-rl
+import opensim as osim
 import numpy as np
 import sys
+from keras.layers import LSTM
 
 from keras.models import Sequential, Model
 from keras.layers import Dense, Activation, Flatten, Input, concatenate
 from keras.optimizers import Adam
 
-from keras.layers import LSTM
 import numpy as np
 
 from rl.agents import DDPGAgent
@@ -20,11 +21,14 @@ from keras.optimizers import RMSprop
 
 import argparse
 import math
+history = np.zeros(100003)
+step = 0
+
 # Command line parameters
 parser = argparse.ArgumentParser(description='Train or test neural net motor controller')
 parser.add_argument('--train', dest='train', action='store_true', default=True)
 parser.add_argument('--test', dest='train', action='store_false', default=True)
-parser.add_argument('--steps', dest='steps', action='store', default=500000, type=int)
+parser.add_argument('--steps', dest='steps', action='store', default=200000, type=int)
 parser.add_argument('--visualize', dest='visualize', action='store_true', default=False)
 parser.add_argument('--model', dest='model', action='store', default="example.h5f")
 parser.add_argument('--token', dest='token', action='store', required=False)
@@ -32,7 +36,7 @@ args = parser.parse_args()
 
 # Load walking environment
 env = RunEnv(args.visualize)
-env.reset()
+env.reset(difficulty = 2)
 
 nb_actions = env.action_space.shape[0]
 
@@ -41,13 +45,25 @@ nallsteps = args.steps
 
 # Create networks for DDPG
 # Next, we build a very simple model.
+# actor = Sequential()
+# actor.add(Flatten(input_shape=(1,) + env.observation_space.shape))
+# actor.add(Dense(32))
+# actor.add(Activation('relu'))
+# actor.add(Dense(32))
+# actor.add(Activation('relu'))
+# actor.add(Dense(32))
+# actor.add(Activation('relu'))
+# actor.add(Dense(nb_actions))
+# actor.add(Activation('sigmoid'))
+# print(actor.summary())
+
 actor = Sequential()
 actor.add(Flatten(input_shape=(1,) + env.observation_space.shape))
-actor.add(LSTM(32))
+actor.add(Dense(256))
 actor.add(Activation('relu'))
-actor.add(LSTM(32))
+actor.add(Dense(256))
 actor.add(Activation('relu'))
-actor.add(LSTM(32))
+actor.add(Dense(256))
 actor.add(Activation('relu'))
 actor.add(Dense(nb_actions))
 actor.add(Activation('sigmoid'))
@@ -57,19 +73,22 @@ action_input = Input(shape=(nb_actions,), name='action_input')
 observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
 flattened_observation = Flatten()(observation_input)
 x = concatenate([action_input, flattened_observation])
-x = LSTM(64)(x)
+#model.add(LSTM(128, input_shape=(maxlen, len(chars))))
+#model.add(Dense(len(chars)))
+#model.add(Activation('softmax'))
+x = Dense(256)(x)
 x = Activation('relu')(x)
-x = LSTM(64)(x)
+x = Dense(256)(x)
 x = Activation('relu')(x)
-x = LSTM(64)(x)
+x = Dense(256)(x)
 x = Activation('relu')(x)
 x = Dense(1)(x)
-x = Activation('linear')(x)
+x = Activation('sigmoid')(x)
 critic = Model(inputs=[action_input, observation_input], outputs=x)
 print(critic.summary())
 
 # Set up the agent for training
-memory = SequentialMemory(limit=500000, window_length=1)
+memory = SequentialMemory(limit=1000000, window_length=1)
 random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.2, size=env.noutput)
 agent = DDPGAgent(nb_actions=nb_actions, actor=actor, critic=critic, critic_action_input=action_input,
                   memory=memory, nb_steps_warmup_critic=100, nb_steps_warmup_actor=100,
@@ -84,7 +103,7 @@ agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 # slows down training quite a lot. You can always safely abort the training prematurely using
 # Ctrl + C.
 if args.train:
-    agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.timestep_limit, log_interval=500000)
+    agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.timestep_limit, log_interval=200000)
     # After training is done, we save the final weights.
     agent.save_weights(args.model, overwrite=True)
 
@@ -116,3 +135,4 @@ if not args.train and not args.token:
     agent.load_weights(args.model)
     # Finally, evaluate our algorithm for 1 episode.
     agent.test(env, nb_episodes=1, visualize=False, nb_max_episode_steps=500)
+
